@@ -36,8 +36,9 @@ enum Notification {
     // Telemetry
     LogTelemetryData = 'telemetry/logdata'
 }
-
 export async function activate (context: vscode.ExtensionContext): Promise<void> {
+    let timeout: NodeJS.Timer | undefined
+
     // Initialize telemetry logger
     telemetryLogger = new TelemetryLogger(context.extension.packageJSON.version)
     telemetryLogger.logEvent({
@@ -49,6 +50,78 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
             vs_code_version: vscode.version
         }
     })
+    function triggerUpdateDecorations (throttle = false): void {
+        if (timeout != null) {
+            clearTimeout(timeout)
+            timeout = undefined
+        }
+        if (throttle) {
+            timeout = setTimeout(updateDecorations, 500)
+        } else {
+            updateDecorations()
+        }
+    }
+    // create a decorator type that we use to decorate small numbers
+    const sectionDecorationType = vscode.window.createTextEditorDecorationType({
+        borderWidth: '0 0 2px 0', // Top, right, bottom, left border widths
+        borderColor: 'rgba(179, 222, 255)', // Red color with 50% opacity
+        borderStyle: 'solid', // Solid border style
+        overviewRulerColor: 'blue',
+        isWholeLine: true,
+        overviewRulerLane: vscode.OverviewRulerLane.Right,
+        light: {
+            // this color will be used in light color themes
+            borderColor: 'rgba(179, 222, 255)'
+        },
+        dark: {
+            // this color will be used in dark color themes
+            borderColor: 'rgba(255, 0, 0)'
+        }
+    })
+    let activeEditor = vscode.window.activeTextEditor
+    function updateDecorations (): void {
+        if (activeEditor == null) {
+            return
+        }
+        const text = activeEditor.document.getText()
+        const textLines = text.split('\n')
+
+        const filteredIndexes: number[] = []
+        textLines.forEach((line, index) => {
+            if (findLineWithPercent(line)) {
+                filteredIndexes.push(index)
+            }
+        })
+
+        function findLineWithPercent (line: any): boolean {
+            const regex = /^\s*%%\s.*/ // Regular expression for "%%" with optional spaces
+            if (regex.test(line)) {
+                return true
+            }
+            return false
+        }
+        const sectionDecorations: vscode.DecorationOptions[] = []
+        filteredIndexes.forEach((index) => {
+            const start = new vscode.Position(index - 1, 0)
+            const end = new vscode.Position(index - 1, Number.MAX_VALUE)
+            const decoration = { range: new vscode.Range(start, end), hoverMessage: 'Section' }
+            sectionDecorations.push(decoration)
+        })
+
+        activeEditor.setDecorations(sectionDecorationType, sectionDecorations)
+    }
+    vscode.window.onDidChangeActiveTextEditor(editor => {
+        activeEditor = editor
+        if (editor != null) {
+            triggerUpdateDecorations()
+        }
+    }, null, context.subscriptions)
+
+    vscode.workspace.onDidChangeTextDocument(event => {
+        if ((activeEditor != null) && event.document === activeEditor.document) {
+            triggerUpdateDecorations(true)
+        }
+    }, null, context.subscriptions)
 
     // Set up status bar indicator
     connectionStatusNotification = vscode.window.createStatusBarItem()
