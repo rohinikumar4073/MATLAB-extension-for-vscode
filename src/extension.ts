@@ -14,7 +14,9 @@ import Notification from './Notifications'
 import ExecutionCommandProvider from './commandwindow/ExecutionCommandProvider'
 
 let client: LanguageClient
-
+let mvm: MVM;
+let terminalService: TerminalService;
+let executionCommandProvider: ExecutionCommandProvider ;
 const OPEN_SETTINGS_ACTION = 'workbench.action.openSettings'
 const MATLAB_INSTALL_PATH_SETTING = 'matlab.installPath'
 
@@ -57,18 +59,18 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
     // create a decorator type that we use to decorate small numbers
     const sectionDecorationType = vscode.window.createTextEditorDecorationType({
         borderWidth: '0 0 2px 0', // Top, right, bottom, left border widths
-        borderColor: 'rgba(179, 222, 255)', // Red color with 50% opacity
+        borderColor: 'rgb(38,140,221)', // Red color with 50% opacity
         borderStyle: 'solid', // Solid border style
         overviewRulerColor: 'blue',
         isWholeLine: true,
         overviewRulerLane: vscode.OverviewRulerLane.Right,
         light: {
             // this color will be used in light color themes
-            borderColor: 'rgba(179, 222, 255)'
+            borderColor: 'rgb(38,140,221)'
         },
         dark: {
             // this color will be used in dark color themes
-            borderColor: 'rgba(255, 0, 0)'
+            borderColor: 'rgb(38,140,221)'
         }
     })
     let activeEditor = vscode.window.activeTextEditor
