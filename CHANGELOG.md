@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2024-05-17
+
+### Changed
+- Tweaks to telemetry logging
+
+### Fixed
+- Resolved packaging failure on Mac
+- Resolved connecting to MATLAB in proxy environment
+
+## [1.2.1] - 2024-04-04
+
+### Added
+- Extension now works with the New Desktop for MATLAB
+
+### Fixed
+- Fixed launching App Designer and Simulink through MATLAB code execution
+
 ## [1.2.0] - 2024-03-05
 
 ### Added
