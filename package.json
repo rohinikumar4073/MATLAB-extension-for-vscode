@@ -25,6 +25,13 @@
 	],
 	"main": "./out/extension.js",
 	"contributes": {
+		"themes": [
+            {
+                "label": "MATLABStyles for VSC",
+                "uiTheme": "vs",
+                "path": "./themes/MATLABStyles.json"
+            }
+        ],
 		"commands": [
 			{
 				"command": "matlab.changeMatlabConnection",

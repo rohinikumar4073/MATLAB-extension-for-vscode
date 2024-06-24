@@ -2,6 +2,7 @@
 
 import * as path from 'path'
 import * as vscode from 'vscode'
+import { MyDocumentSymbolProvider } from './styling/myDocumentSymbolProvider';
 import {
     LanguageClient, LanguageClientOptions, ServerOptions, TransportKind
 } from 'vscode-languageclient/node'
@@ -12,14 +13,15 @@ import { Notifier } from './commandwindow/Utilities'
 import TerminalService from './commandwindow/TerminalService'
 import Notification from './Notifications'
 import ExecutionCommandProvider from './commandwindow/ExecutionCommandProvider'
+import { handleSelectionChange, addSectionDecoration, clearBlueDecoratons } from './styling/SectionStyling'
 
 let client: LanguageClient
 let mvm: MVM;
 let terminalService: TerminalService;
-let executionCommandProvider: ExecutionCommandProvider ;
+let executionCommandProvider: ExecutionCommandProvider;
 const OPEN_SETTINGS_ACTION = 'workbench.action.openSettings'
 const MATLAB_INSTALL_PATH_SETTING = 'matlab.installPath'
-
+let previousFocusedEditor: vscode.TextEditor | undefined;
 export const CONNECTION_STATUS_LABELS = {
     CONNECTED: 'MATLAB: Connected',
     NOT_CONNECTED: 'MATLAB: Not Connected',
@@ -30,9 +32,9 @@ export let connectionStatusNotification: vscode.StatusBarItem
 
 let telemetryLogger: TelemetryLogger
 
-
 export async function activate (context: vscode.ExtensionContext): Promise<void> {
-    let timeout: NodeJS.Timer | undefined
+    const provider = new MyDocumentSymbolProvider();
+    const selector: vscode.DocumentSelector = { language: 'MATLAB' };
 
     // Initialize telemetry logger
     telemetryLogger = new TelemetryLogger(context.extension.packageJSON.version)
@@ -45,78 +47,6 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
             vs_code_version: vscode.version
         }
     })
-    function triggerUpdateDecorations (throttle = false): void {
-        if (timeout != null) {
-            clearTimeout(timeout)
-            timeout = undefined
-        }
-        if (throttle) {
-            timeout = setTimeout(updateDecorations, 500)
-        } else {
-            updateDecorations()
-        }
-    }
-    // create a decorator type that we use to decorate small numbers
-    const sectionDecorationType = vscode.window.createTextEditorDecorationType({
-        borderWidth: '0 0 2px 0', // Top, right, bottom, left border widths
-        borderColor: 'rgb(38,140,221)', // Red color with 50% opacity
-        borderStyle: 'solid', // Solid border style
-        overviewRulerColor: 'blue',
-        isWholeLine: true,
-        overviewRulerLane: vscode.OverviewRulerLane.Right,
-        light: {
-            // this color will be used in light color themes
-            borderColor: 'rgb(38,140,221)'
-        },
-        dark: {
-            // this color will be used in dark color themes
-            borderColor: 'rgb(38,140,221)'
-        }
-    })
-    let activeEditor = vscode.window.activeTextEditor
-    function updateDecorations (): void {
-        if (activeEditor == null) {
-            return
-        }
-        const text = activeEditor.document.getText()
-        const textLines = text.split('\n')
-
-        const filteredIndexes: number[] = []
-        textLines.forEach((line, index) => {
-            if (findLineWithPercent(line)) {
-                filteredIndexes.push(index)
-            }
-        })
-
-        function findLineWithPercent (line: any): boolean {
-            const regex = /^\s*%%\s.*/ // Regular expression for "%%" with optional spaces
-            if (regex.test(line)) {
-                return true
-            }
-            return false
-        }
-        const sectionDecorations: vscode.DecorationOptions[] = []
-        filteredIndexes.forEach((index) => {
-            const start = new vscode.Position(index - 1, 0)
-            const end = new vscode.Position(index - 1, Number.MAX_VALUE)
-            const decoration = { range: new vscode.Range(start, end), hoverMessage: 'Section' }
-            sectionDecorations.push(decoration)
-        })
-
-        activeEditor.setDecorations(sectionDecorationType, sectionDecorations)
-    }
-    vscode.window.onDidChangeActiveTextEditor(editor => {
-        activeEditor = editor
-        if (editor != null) {
-            triggerUpdateDecorations()
-        }
-    }, null, context.subscriptions)
-
-    vscode.workspace.onDidChangeTextDocument(event => {
-        if ((activeEditor != null) && event.document === activeEditor.document) {
-            triggerUpdateDecorations(true)
-        }
-    }, null, context.subscriptions)
 
     // Set up status bar indicator
     connectionStatusNotification = vscode.window.createStatusBarItem()
@@ -126,6 +56,8 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
     context.subscriptions.push(connectionStatusNotification)
 
     context.subscriptions.push(vscode.commands.registerCommand(CONNECTION_STATUS_COMMAND, () => handleChangeMatlabConnection()))
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(handleSelectionChange));
+    context.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(selector, provider));
 
     // Set up langauge server
     const serverModule: string = context.asAbsolutePath(
@@ -172,6 +104,7 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
     client.onNotification(Notification.MatlabFeatureUnavailable, () => handleFeatureUnavailable())
     client.onNotification(Notification.MatlabFeatureUnavailableNoMatlab, () => handleFeatureUnavailableWithNoMatlab())
     client.onNotification(Notification.LogTelemetryData, (data: TelemetryEvent) => handleTelemetryReceived(data))
+    client.onNotification(Notification.MatlabSections, (sections) => addSectionDecoration(sections))
 
     mvm = new MVM(client as Notifier);
     terminalService = new TerminalService(client as Notifier, mvm);
@@ -183,7 +116,12 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
     context.subscriptions.push(vscode.commands.registerCommand('matlab.openCommandWindow', async () => await terminalService.openTerminalOrBringToFront()))
     context.subscriptions.push(vscode.commands.registerCommand('matlab.addToPath', async (uri: vscode.Uri) => await executionCommandProvider.handleAddToPath(uri)))
     context.subscriptions.push(vscode.commands.registerCommand('matlab.changeDirectory', async (uri: vscode.Uri) => await executionCommandProvider.handleChangeDirectory(uri)))
-
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (previousFocusedEditor !== undefined && previousFocusedEditor !== editor) {
+            clearBlueDecoratons(previousFocusedEditor);
+        }
+        previousFocusedEditor = editor;
+    }))
     await client.start()
 }
 
@@ -326,7 +264,6 @@ function getServerArgs (context: vscode.ExtensionContext): string[] {
     if (configuration.get<boolean>('indexWorkspace') ?? false) {
         args.push('--indexWorkspace')
     }
-
     return args
 }
 
