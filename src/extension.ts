@@ -2,7 +2,6 @@
 
 import * as path from 'path'
 import * as vscode from 'vscode'
-import { MyDocumentSymbolProvider } from './styling/myDocumentSymbolProvider';
 import {
     LanguageClient, LanguageClientOptions, ServerOptions, TransportKind
 } from 'vscode-languageclient/node'
@@ -33,9 +32,6 @@ export let connectionStatusNotification: vscode.StatusBarItem
 let telemetryLogger: TelemetryLogger
 
 export async function activate (context: vscode.ExtensionContext): Promise<void> {
-    const provider = new MyDocumentSymbolProvider();
-    const selector: vscode.DocumentSelector = { language: 'MATLAB' };
-
     // Initialize telemetry logger
     telemetryLogger = new TelemetryLogger(context.extension.packageJSON.version)
     telemetryLogger.logEvent({
@@ -57,7 +53,6 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
 
     context.subscriptions.push(vscode.commands.registerCommand(CONNECTION_STATUS_COMMAND, () => handleChangeMatlabConnection()))
     context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(handleSelectionChange));
-    context.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(selector, provider));
 
     // Set up langauge server
     const serverModule: string = context.asAbsolutePath(
