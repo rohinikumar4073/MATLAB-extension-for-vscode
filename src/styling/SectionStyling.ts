@@ -37,9 +37,14 @@ const greyBorderBottomDecoration = vscode.window.createTextEditorDecorationType(
 
 // Create a decorator type for all sectoin
 
-function clearBlueDecoratons (editor: vscode.TextEditor): void {
-    editor.setDecorations(blueBorderTopDecoration, []);
-    editor.setDecorations(blueBorderBottomDecoration, []);
+function handleSelectionChange (event: any): void {
+    const selections = event.selections;
+    selections.forEach((selection: { isEmpty: boolean, active: any }, index: any) => {
+        if (selection.isEmpty) {
+            cachedCursorPosition = selection.active;
+        }
+    });
+    addSectionDecoration(previousEditorSections);
 }
 
 function addSectionDecoration (sections: any): void {
@@ -54,9 +59,13 @@ function addSectionDecoration (sections: any): void {
     const { blueRanges, greyRanges } = getSectionDecorationRanges(startLines, endLines, focusedSectionRange);
 
     activeEditor.setDecorations(blueBorderTopDecoration, blueRanges.top);
-    activeEditor.setDecorations(blueBorderBottomDecoration, blueRanges.bottom);
+    // activeEditor.setDecorations(blueBorderBottomDecoration, blueRanges.bottom);
     activeEditor.setDecorations(greyBorderTopDecoration, greyRanges.top);
-    activeEditor.setDecorations(greyBorderBottomDecoration, greyRanges.bottom);
+    // activeEditor.setDecorations(greyBorderBottomDecoration, greyRanges.bottom);
+}
+function clearBlueDecorations (editor: vscode.TextEditor): void {
+    editor.setDecorations(blueBorderTopDecoration, []);
+    editor.setDecorations(blueBorderBottomDecoration, []);
 }
 function getSectionDecorationRanges (startLines: Set<number>,
     endLines: Set<number>, focusedSectionRange: vscode.Range | undefined): {
@@ -135,7 +144,6 @@ function convertSectionsToRanges (sections: any): SectionDetails {
     const startLines = new Set<number>();
     const endLines = new Set<number>();
 
-    console.log('convert to section');
     const ranges = sections.map((section: any) => {
         const startingIndex = section.start.line
         const endingIndex = section.end.line
@@ -149,15 +157,4 @@ function convertSectionsToRanges (sections: any): SectionDetails {
     return { ranges, startLines, endLines };
 }
 
-function handleSelectionChange (event: any): void {
-    console.log('Selection change');
-    const selections = event.selections;
-    selections.forEach((selection: { isEmpty: boolean, active: any }, index: any) => {
-        if (selection.isEmpty) {
-            cachedCursorPosition = selection.active;
-        }
-    });
-    addSectionDecoration(previousEditorSections);
-}
-
-export { addSectionDecoration, handleSelectionChange, clearBlueDecoratons };
+export { addSectionDecoration, handleSelectionChange, clearBlueDecorations };

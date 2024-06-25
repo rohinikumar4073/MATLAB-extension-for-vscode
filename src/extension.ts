@@ -12,7 +12,7 @@ import { Notifier } from './commandwindow/Utilities'
 import TerminalService from './commandwindow/TerminalService'
 import Notification from './Notifications'
 import ExecutionCommandProvider from './commandwindow/ExecutionCommandProvider'
-import { handleSelectionChange, addSectionDecoration, clearBlueDecoratons } from './styling/SectionStyling'
+import { handleSelectionChange, addSectionDecoration, clearBlueDecorations } from './styling/SectionStyling'
 
 let client: LanguageClient
 let mvm: MVM;
@@ -113,7 +113,7 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
     context.subscriptions.push(vscode.commands.registerCommand('matlab.changeDirectory', async (uri: vscode.Uri) => await executionCommandProvider.handleChangeDirectory(uri)))
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (previousFocusedEditor !== undefined && previousFocusedEditor !== editor) {
-            clearBlueDecoratons(previousFocusedEditor);
+            clearBlueDecorations(previousFocusedEditor);
         }
         previousFocusedEditor = editor;
     }))
