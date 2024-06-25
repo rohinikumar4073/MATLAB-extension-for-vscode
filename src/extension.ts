@@ -12,12 +12,15 @@ import { Notifier } from './commandwindow/Utilities'
 import TerminalService from './commandwindow/TerminalService'
 import Notification from './Notifications'
 import ExecutionCommandProvider from './commandwindow/ExecutionCommandProvider'
+import { handleSelectionChange, addSectionDecoration, clearBlueDecorations } from './styling/SectionStyling'
 
 let client: LanguageClient
-
+let mvm: MVM;
+let terminalService: TerminalService;
+let executionCommandProvider: ExecutionCommandProvider;
 const OPEN_SETTINGS_ACTION = 'workbench.action.openSettings'
 const MATLAB_INSTALL_PATH_SETTING = 'matlab.installPath'
-
+let previousFocusedEditor: vscode.TextEditor | undefined;
 export const CONNECTION_STATUS_LABELS = {
     CONNECTED: 'MATLAB: Connected',
     NOT_CONNECTED: 'MATLAB: Not Connected',
@@ -27,10 +30,6 @@ const CONNECTION_STATUS_COMMAND = 'matlab.changeMatlabConnection'
 export let connectionStatusNotification: vscode.StatusBarItem
 
 let telemetryLogger: TelemetryLogger
-
-let mvm: MVM;
-let terminalService: TerminalService;
-let executionCommandProvider: ExecutionCommandProvider;
 
 export async function activate (context: vscode.ExtensionContext): Promise<void> {
     // Initialize telemetry logger
@@ -53,6 +52,7 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
     context.subscriptions.push(connectionStatusNotification)
 
     context.subscriptions.push(vscode.commands.registerCommand(CONNECTION_STATUS_COMMAND, () => handleChangeMatlabConnection()))
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(handleSelectionChange));
 
     // Set up langauge server
     const serverModule: string = context.asAbsolutePath(
@@ -99,6 +99,7 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
     client.onNotification(Notification.MatlabFeatureUnavailable, () => handleFeatureUnavailable())
     client.onNotification(Notification.MatlabFeatureUnavailableNoMatlab, () => handleFeatureUnavailableWithNoMatlab())
     client.onNotification(Notification.LogTelemetryData, (data: TelemetryEvent) => handleTelemetryReceived(data))
+    client.onNotification(Notification.MatlabSections, (sections) => addSectionDecoration(sections))
 
     mvm = new MVM(client as Notifier);
     terminalService = new TerminalService(client as Notifier, mvm);
@@ -110,7 +111,12 @@ export async function activate (context: vscode.ExtensionContext): Promise<void>
     context.subscriptions.push(vscode.commands.registerCommand('matlab.openCommandWindow', async () => await terminalService.openTerminalOrBringToFront()))
     context.subscriptions.push(vscode.commands.registerCommand('matlab.addToPath', async (uri: vscode.Uri) => await executionCommandProvider.handleAddToPath(uri)))
     context.subscriptions.push(vscode.commands.registerCommand('matlab.changeDirectory', async (uri: vscode.Uri) => await executionCommandProvider.handleChangeDirectory(uri)))
-
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (previousFocusedEditor !== undefined && previousFocusedEditor !== editor) {
+            clearBlueDecorations(previousFocusedEditor);
+        }
+        previousFocusedEditor = editor;
+    }))
     await client.start()
 }
 
@@ -253,7 +259,6 @@ function getServerArgs (context: vscode.ExtensionContext): string[] {
     if (configuration.get<boolean>('indexWorkspace') ?? false) {
         args.push('--indexWorkspace')
     }
-
     return args
 }
 
