@@ -5,8 +5,5 @@
     "search.exclude": {
         "out": true
     },
-    "typescript.tsc.autoDetect": "off",
-    "workbench.preferredDarkColorTheme": "Default Dark Modern",
-    "workbench.colorTheme": "Quiet Light",
-    "workbench.preferredLightColorTheme": "Abyss"
+    "typescript.tsc.autoDetect": "off"
 }
